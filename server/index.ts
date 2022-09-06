@@ -18,12 +18,35 @@ const typeDefs = /* GraphQL */`
   type Query {
     getTodos: [Todo]!
   }
+  type Mutation {
+    addTodo(text: String!): Todo
+    setDone(id: ID!, done: Boolean!): Todo
+  }
 `;
 
 const resolvers = {
   Query: {
     getTodos: () => {
       return todos;
+    }
+  },
+  Mutation: {
+    addTodo: (_: unknown, {text}: {text: string}) => {
+      const newTodo = {
+        id: String(todos.length+1),
+        text,
+        done: false
+      }
+        todos.push(newTodo)
+        return newTodo
+    },
+    setDone: (_: unknown, {id, done}: {id: string, done: boolean}) => {
+      const todo = todos.find(todo => todo.id === id);
+      if(!todo) {
+        throw new Error('Todo not found')
+      }
+      todo.done = done
+      return todo
     }
   }
 }
@@ -34,12 +57,7 @@ const schema = makeExecutableSchema({
 })
 
 const cors = {
-  origin: ['http://localhost:3000', 'http://localhost:4000', 'http://0.0.0.0:4000'],
-  credentials: true,
-  allowedHeaders: ['X-Custom-Header'],
-  methods: ['POST', 'GET', 'PUT', 'PATCH', 'DELETE'],
-  preflightContinue: true,
-  optionsSuccessStatus: 200
+  origin: '*',
 }
 
 async function main() {
