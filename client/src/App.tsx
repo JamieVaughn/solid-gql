@@ -1,10 +1,43 @@
 import type { Component } from "solid-js";
 import { createResource, For, Show, createSignal } from "solid-js";
-import { createClient } from "@urql/core";
+import {
+  createClient,
+  defaultExchanges,
+  subscriptionExchange,
+} from "@urql/core";
 import styles from "./App.module.css";
+import { SubscriptionClient } from "subscriptions-transport-ws";
+import { pipe, subscribe } from "wonka";
+import { createClient as createWSClient } from "graphql-ws";
+
+// const subscriptionClient = new SubscriptionClient(
+//   "ws://localhost:4000/graphql",
+//   {
+//     reconnect: true,
+//   }
+// );
+
+const wsClient = createWSClient({
+  url: "ws://localhost:4000/graphql",
+});
 
 const client = createClient({
   url: "http://localhost:4000/graphql",
+  exchanges: [
+    ...defaultExchanges,
+    subscriptionExchange({
+      forwardSubscription: (operation) => {
+        return {
+          subscribe: (sink) => {
+            const dispose = wsClient.subscribe(operation, sink);
+            return {
+              unsubscribe: dispose,
+            };
+          },
+        };
+      },
+    }),
+  ],
 });
 
 const todoId = 1;
@@ -33,7 +66,31 @@ type Todo = {
   done: boolean;
 };
 
-const [todos, { refetch }] = createResource(todoId, fetchTodos);
+const [todos, setTodos] = createSignal<Todo[]>([]); // use this for websockets API
+const sub = /* GraphQL */ `
+  subscription TODOS_CHANNEL {
+    todos {
+      id
+      done
+      text
+    }
+  }
+`;
+
+client.subscription(sub, {});
+// const { unsubscribe } = pipe(
+//   client.subscription(sub),
+//   subscribe((result: { data: { todos: Todo[] } }) => {
+//     try {
+//       console.log(result);
+//       setTodos(result.data.todos);
+//     } catch (err) {
+//       console.log(err);
+//     }
+//   })
+// );
+
+// const [todos, { refetch }] = createResource(todoId, fetchTodos); // use this for simple API w/o websockets
 
 const Spinner = () => <div>Loading...</div>;
 
@@ -49,10 +106,10 @@ const App: Component = () => {
         }
       }
     `,
-        { id, done: !todos().find((todo: Todo) => todo.id === id).done }
+        { id, done: !todos().find((todo: Todo) => todo.id === id)?.done }
       )
       .toPromise();
-    refetch();
+    // refetch(); // use for simple API
   };
   const onAdd = async () => {
     await client
@@ -68,7 +125,7 @@ const App: Component = () => {
       )
       .toPromise();
     setText("");
-    refetch();
+    // refetch(); // use for simple API
   };
   return (
     <div class={styles.App}>

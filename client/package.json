@@ -17,6 +17,9 @@
   "dependencies": {
     "@urql/core": "^3.0.3",
     "graphql": "^16.6.0",
-    "solid-js": "^1.5.1"
+    "graphql-ws": "^5.10.1",
+    "solid-js": "^1.5.1",
+    "subscriptions-transport-ws": "^0.11.0",
+    "wonka": "^6.0.0"
   }
 }
