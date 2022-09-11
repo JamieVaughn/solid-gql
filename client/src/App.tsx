@@ -6,23 +6,18 @@ import {
   subscriptionExchange,
 } from "@urql/core";
 import styles from "./App.module.css";
-import { SubscriptionClient } from "subscriptions-transport-ws";
 import { pipe, subscribe } from "wonka";
 import { createClient as createWSClient } from "graphql-ws";
-
-// const subscriptionClient = new SubscriptionClient(
-//   "ws://localhost:4000/graphql",
-//   {
-//     reconnect: true,
-//   }
-// );
 
 const wsClient = createWSClient({
   url: "ws://localhost:4000/graphql",
 });
 
+wsClient;
+
 const client = createClient({
   url: "http://localhost:4000/graphql",
+  requestPolicy: "cache-first",
   exchanges: [
     ...defaultExchanges,
     subscriptionExchange({
@@ -67,6 +62,7 @@ type Todo = {
 };
 
 const [todos, setTodos] = createSignal<Todo[]>([]); // use this for websockets API
+const [count, setCount] = createSignal<number>(10); // use this for websockets API
 const sub = /* GraphQL */ `
   subscription TODOS_CHANNEL {
     todos {
@@ -76,19 +72,36 @@ const sub = /* GraphQL */ `
     }
   }
 `;
+const countdown = /* GraphQL */ `
+  subscription countdown {
+    countdown(from: 10)
+  }
+`;
 
-client.subscription(sub, {});
-// const { unsubscribe } = pipe(
-//   client.subscription(sub),
-//   subscribe((result: { data: { todos: Todo[] } }) => {
-//     try {
-//       console.log(result);
-//       setTodos(result.data.todos);
-//     } catch (err) {
-//       console.log(err);
-//     }
-//   })
-// );
+type Result = any; //{ data: { todos: Todo[] }}
+const { unsubscribe } = pipe(
+  client.subscription(sub, {}),
+  subscribe(({ data, error }) => {
+    console.log("todos", data, error);
+    try {
+      setTodos(data?.todos || { id: "1", text: `error: ${error}` });
+    } catch (err) {
+      console.log(err);
+    }
+  })
+);
+
+const _wonka = pipe(
+  client.subscription(countdown, {}),
+  subscribe(({ data, error }) => {
+    console.log("count", data, error);
+    try {
+      setCount(data?.countdown);
+    } catch (err) {
+      console.log(err);
+    }
+  })
+);
 
 // const [todos, { refetch }] = createResource(todoId, fetchTodos); // use this for simple API w/o websockets
 
@@ -129,7 +142,7 @@ const App: Component = () => {
   };
   return (
     <div class={styles.App}>
-      <header class={styles.header}>Hello</header>
+      <header class={styles.header}>Hello - {count()}</header>
       <Show when={todos()} fallback={Spinner}>
         <ul>
           <For each={todos()}>
@@ -155,6 +168,7 @@ const App: Component = () => {
           type="text"
           value={text()}
           onInput={(e) => setText(e.currentTarget.value)}
+          onKeyPress={(e) => (e.code === "Enter" ? onAdd() : null)}
         />
         <button onClick={onAdd}>Add</button>
       </div>
